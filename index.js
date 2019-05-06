@@ -1,12 +1,21 @@
-/* eslint-disable brace-style */
-/* eslint-disable indent */
 // require the discord.js module
+const fs = require('fs');
 const Discord = require('discord.js');
-
 const { prefix, token } = require ('./config.json');
 
 // create a new Discord client
 const client = new Discord.Client();
+client.commands = new Discord.Collection();
+
+const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+
+for (const file of commandFiles) {
+    const command = require(`./commands/${file}`);
+
+    // set a new item in the Collection
+    // with the key as the command name and the value as the exported module
+    client.commands.set(command.name, command);
+}
 
 // when the client is ready, run this code
 // this event will only trigger one time after logging in
@@ -22,33 +31,13 @@ client.on('message', message => {
     const args = message.content.slice(prefix.length).split(/ +/);
     const command = args.shift().toLowerCase();
 
-    if (message.content.startsWith(`${prefix}ping`)) {
-        message.channel.send('Pong.');
-    }
-    else if (message.content === `${prefix}server`) {
-        message.channel.send(`Server name: ${message.guild.name}\nTotal Members: ${message.guild.memberCount}`);
-    }
-    else if (message.content === `${prefix}user-info`) {
-        message.channel.send(`Your username: ${message.author.username}\nYour ID: ${message.author.id}`);
-    }
-    else if (command === 'kick') {
-        if (!message.mentions.users.size) {
-            return message.reply('you need to tag a user in order to kick them!');
-        }
-        const taggedUser = message.mentions.users.first();
+    if (!client.commands.has(command)) return;
 
-        message.channel.send(`You wanted to kick: ${taggedUser.username}`);
-    }
-    else if (command === 'prune') {
-        const amount = parseInt(args[0]);
-
-        if (isNaN(amount)) {
-            return message.reply('that doesn\'t seem to be a valid number.');
-        } else if (amount < 2 || amount > 100) {
-            return message.reply('you need to input a number between 2 and 100.');
-        } else {
-            message.channel.bulkDelete(amount);
-        }
+    try {
+        client.commands.get(command).execute(message, args);
+    } catch (error) {
+        console.error(error);
+        message.reply('there was an error trying to execute that command!');
     }
 });
 
